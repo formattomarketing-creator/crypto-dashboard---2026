@@ -1,0 +1,18 @@
+{
+  "name": "Crypto Dashboard",
+  "short_name": "CryptoDash",
+  "description": "Swing trade dashboard com sinais técnicos em tempo real",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07070d",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
