@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#07070d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CryptoDash" />
+  <meta name="description" content="Swing trade dashboard com sinais técnicos em tempo real" />
+  <title>Crypto Dashboard</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── RESET & BASE ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #07070d; color: #fff; font-family: 'Syne', sans-serif; overflow-x: hidden; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #1a1a2a; border-radius: 2px; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes fadeIn  { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pulse   { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    /* ── LAYOUT ── */
+    #app { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom, 20px); }
+
+    /* ── HEADER ── */
+    .header {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(7,7,13,0.92); backdrop-filter: blur(16px);
+      border-bottom: 1px solid #111;
+      padding: 20px 20px 16px;
+      padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    }
+    .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+    .header-label { font-size: 9px; color: #2a2a3a; letter-spacing: 3px; margin-bottom: 4px; }
+    .header-title { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-title span { color: #3b82f6; }
+    .header-meta { font-size: 10px; color: #222; margin-top: 8px; font-family: 'Space Mono', monospace; }
+
+    /* ── REFRESH BUTTON ── */
+    .btn-refresh {
+      background: #111827; border: 1px solid #3b82f633;
+      color: #3b82f6; border-radius: 10px; padding: 8px 16px;
+      font-size: 12px; font-family: 'Space Mono', monospace;
+      cursor: pointer; transition: all 0.3s; white-space: nowrap;
+    }
+    .btn-refresh:disabled { background: #0f0f14; border-color: #1a1a2a; color: #2a2a3a; cursor: not-allowed; }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: 2px; padding: 14px 20px 0; border-bottom: 1px solid #0f0f14; }
+    .tab {
+      background: transparent; border: 1px solid transparent;
+      border-bottom: none; color: #444;
+      border-radius: 8px 8px 0 0; padding: 10px 16px;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      font-family: 'Syne', sans-serif; transition: all 0.2s;
+      margin-bottom: -1px;
+    }
+    .tab.active { background: #0f0f1e; border-color: #1a1a3a; color: #fff; }
+
+    /* ── CONTENT ── */
+    .content { padding: 20px; animation: fadeIn 0.3s ease; }
+
+    /* ── SECTION LABEL ── */
+    .section-label { font-size: 9px; color: #222; letter-spacing: 3px; margin-bottom: 16px; }
+
+    /* ── COIN GRID ── */
+    .coin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+
+    /* ── COIN CARD ── */
+    .coin-card {
+      background: linear-gradient(135deg, #0f0f14 0%, #12121c 100%);
+      border: 1px solid #1a1a2a; border-radius: 16px;
+      padding: 20px; position: relative; overflow: hidden;
+      transition: border-color 0.5s;
+    }
+    .coin-card-accent {
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .coin-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .coin-symbol-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .coin-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .coin-symbol { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; }
+    .coin-badge { font-size: 10px; background: #ffffff0f; border-radius: 4px; padding: 1px 6px; color: #555; }
+    .coin-price { font-size: 22px; font-weight: 800; }
+    .coin-change { font-size: 12px; margin-top: 2px; }
+
+    /* ── INDICATORS ── */
+    .indicators { display: flex; gap: 8px; margin-bottom: 14px; }
+    .indicator {
+      flex: 1; background: #08080f; border-radius: 8px;
+      padding: 8px 6px; text-align: center; border: 1px solid #161622;
+    }
+    .indicator.alert { border-color: #f59e0b44; }
+    .indicator-label { font-size: 9px; color: #333; letter-spacing: 1px; margin-bottom: 3px; }
+    .indicator-value { font-size: 11px; color: #bbb; font-family: 'Space Mono', monospace; font-weight: 700; }
+    .indicator.alert .indicator-value { color: #f59e0b; }
+
+    /* ── SIGNAL BADGE ── */
+    .signal-badge {
+      display: inline-block; border-radius: 6px; padding: 4px 12px;
+      font-size: 11px; font-weight: 700; letter-spacing: 1px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* ── SIGNAL BAR ── */
+    .signal-bar-wrap { margin-top: 10px; }
+    .signal-bar-label { font-size: 9px; color: #222; letter-spacing: 1px; margin-bottom: 4px; }
+    .signal-bar-bg { height: 4px; background: #0f0f0f; border-radius: 2px; overflow: hidden; }
+    .signal-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+
+    /* ── LOADING / ERROR ── */
+    .loading-row { display: flex; gap: 10px; align-items: center; color: #2a2a3a; font-size: 12px; margin-top: 8px; }
+    .spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid; border-top-color: transparent; animation: spin 0.8s linear infinite; }
+    .error-msg { font-size: 12px; color: #ef4444; margin-top: 8px; line-height: 1.5; }
+
+    /* ── SIGNAL GUIDE ── */
+    .guide { margin-top: 22px; padding: 16px 18px; background: #0a0a0f; border: 1px solid #111; border-radius: 12px; }
+    .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .guide-item { display: flex; gap: 8px; align-items: flex-start; }
+    .guide-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; margin-top: 3px; }
+    .guide-signal { font-size: 11px; font-weight: 700; }
+    .guide-desc { font-size: 10px; color: #333; }
+
+    /* ── CALENDAR ── */
+    .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .cal-btn { background: #111; border: 1px solid #222; color: #aaa; border-radius: 8px; padding: 6px 16px; cursor: pointer; font-size: 16px; }
+    .cal-title { font-size: 18px; font-weight: 800; }
+    .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #555; }
+    .cal-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+    .cal-days-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+    .cal-day-name { text-align: center; font-size: 10px; color: #2a2a3a; letter-spacing: 1px; padding: 4px 0; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-cell {
+      min-height: 46px; border-radius: 8px; padding: 6px 4px;
+      background: #09090f; border: 1px solid #111;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .cal-cell.today { border-color: #3b82f6; background: #0d0d22; }
+    .cal-cell.has-event { cursor: pointer; }
+    .cal-cell-num { font-size: 12px; font-family: 'Space Mono', monospace; color: #333; }
+    .cal-cell.today .cal-cell-num { color: #60a5fa; font-weight: 700; }
+    .cal-event-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; }
+    .cal-event-detail { border-radius: 12px; padding: 16px 20px; margin-top: 20px; animation: fadeIn 0.2s ease; }
+    .cal-event-type { font-size: 10px; letter-spacing: 2px; margin-bottom: 4px; }
+    .cal-event-title { font-size: 16px; font-weight: 700; }
+    .cal-event-desc { margin-top: 10px; font-size: 13px; color: #aaa; line-height: 1.7; }
+    .cal-close { background: none; border: none; color: #555; cursor: pointer; font-size: 20px; }
+    .cal-upcoming-label { font-size: 10px; color: #222; letter-spacing: 2px; margin-bottom: 14px; margin-top: 28px; }
+    .cal-upcoming-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #0d0d0d; cursor: pointer; }
+    .cal-upcoming-bar { width: 3px; border-radius: 2px; flex-shrink: 0; }
+    .cal-upcoming-date { font-size: 10px; color: #333; font-family: 'Space Mono', monospace; margin-bottom: 2px; }
+    .cal-upcoming-title { font-size: 13px; font-weight: 600; }
+    .cal-upcoming-desc { font-size: 12px; color: #444; margin-top: 2px; }
+
+    /* ── REBALANCE ── */
+    .rebal-alert { padding: 12px 16px; background: #0a160a; border: 1px solid #22c55e33; border-radius: 10px; margin-bottom: 20px; }
+    .rebal-alert-label { font-size: 10px; color: #22c55e; letter-spacing: 2px; margin-bottom: 6px; }
+    .rebal-alert-text { font-size: 13px; color: #888; line-height: 1.7; }
+    .rebal-item { margin-bottom: 18px; }
+    .rebal-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .rebal-sym-row { display: flex; align-items: center; gap: 8px; }
+    .rebal-sym { font-family: 'Space Mono', monospace; font-size: 12px; color: #ccc; }
+    .rebal-nums { display: flex; gap: 12px; align-items: center; }
+    .rebal-curr { font-size: 11px; color: #333; }
+    .rebal-target { font-size: 11px; color: #444; }
+    .rebal-diff { font-size: 11px; font-weight: 700; }
+    .rebal-bar-bg { position: relative; height: 6px; background: #0d0d0d; border-radius: 3px; overflow: hidden; }
+    .rebal-bar-curr { position: absolute; top:0; left:0; height:100%; border-radius:3px; }
+    .rebal-bar-target { position: absolute; top:0; left:0; height:100%; border-radius:3px; background:transparent; }
+    .rebal-plan { margin-top: 20px; padding: 14px 18px; background: #0a0a14; border: 1px solid #3b82f644; border-radius: 12px; }
+    .rebal-plan-label { font-size: 10px; color: #3b82f6; letter-spacing: 2px; margin-bottom: 10px; }
+    .rebal-tip { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+    .rebal-tip-arrow { color: #3b82f6; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+    .rebal-tip-text { font-size: 13px; color: #777; line-height: 1.6; }
+
+    /* ── INSTALL BANNER ── */
+    #install-banner {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #111827; border: 1px solid #3b82f6;
+      border-radius: 14px; padding: 14px 20px;
+      display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 8px 32px #3b82f622;
+      z-index: 100; max-width: 340px; width: calc(100% - 40px);
+      animation: fadeIn 0.4s ease;
+    }
+    #install-banner.hidden { display: none; }
+    .install-text { flex: 1; }
+    .install-title { font-size: 14px; font-weight: 700; color: #fff; }
+    .install-sub { font-size: 12px; color: #555; margin-top: 2px; }
+    .install-btn { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Syne', sans-serif; }
+    .install-close { background: none; border: none; color: #333; cursor: pointer; font-size: 18px; }
+  </style>
+
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <div class="header-label">SWING TRADE · PERFIL AGRESSIVO · DADOS REAIS</div>
+        <div class="header-title">Crypto <span>Dashboard</span></div>
+      </div>
+      <button class="btn-refresh" id="btn-refresh" onclick="refresh()">↻ Atualizar</button>
+    </div>
+    <div class="header-meta" id="header-meta">carregando dados reais...</div>
+  </div>
+
+  <!-- TABS -->
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('signals', this)">📊 Sinais</button>
+    <button class="tab" onclick="switchTab('calendar', this)">📅 Calendário</button>
+    <button class="tab" onclick="switchTab('rebalance', this)">⚖️ Rebalancear</button>
+  </div>
+
+  <!-- PANELS -->
+
+  <div id="panel-signals" class="content"></div>
+  <div id="panel-calendar" class="content" style="display:none"></div>
+  <div id="panel-rebalance" class="content" style="display:none"></div>
+</div>
+
+<!-- INSTALL BANNER (PWA) -->
+
+<div id="install-banner" class="hidden">
+  <div class="install-text">
+    <div class="install-title">📲 Instalar como App</div>
+    <div class="install-sub">Adicionar à tela inicial do celular</div>
+  </div>
+  <button class="install-btn" onclick="installPWA()">Instalar</button>
+  <button class="install-close" onclick="document.getElementById('install-banner').classList.add('hidden')">✕</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════
+const COINS = [
+  { id:"polkadot",    symbol:"DOT",  name:"Polkadot",   color:"#E6007A", owned:true  },
+  { id:"ethereum",    symbol:"ETH",  name:"Ethereum",   color:"#627EEA", owned:true  },
+  { id:"solana",      symbol:"SOL",  name:"Solana",     color:"#9945FF", owned:true  },
+  { id:"bitcoin",     symbol:"BTC",  name:"Bitcoin",    color:"#F7931A", owned:false },
+  { id:"avalanche-2", symbol:"AVAX", name:"Avalanche",  color:"#E84142", owned:false },
+];
+
+const CALENDAR_EVENTS = [
+  { date:"2025-05-05", type:"analysis",  title:"Análise Semanal",    desc:"Revisão de RSI + EMAs. Verificar sinais abertos e posições em aberto." },
+  { date:"2025-05-07", type:"fed",       title:"Fed Minutes",        desc:"Ata do Fed — impacto macro em cripto. Aguardar antes de entrar em novas posições." },
+  { date:"2025-05-12", type:"analysis",  title:"Análise Semanal",    desc:"Revisão de RSI + EMAs. Checar rebalanceamento quinzenal." },
+  { date:"2025-05-15", type:"rebalance", title:"Rebalanceamento",    desc:"Verificar alocações. Meta: DOT 40%, ETH 35%, BTC 15%, diversificação 10%." },
+  { date:"2025-05-19", type:"analysis",  title:"Análise Semanal",    desc:"Revisão de RSI + EMAs. Verificar sinais e stops ativos." },
+  { date:"2025-05-22", type:"staking",   title:"Revisão de Staking", desc:"Avaliar se manter ETH/SOL em staking ou liberar para aproveitar oportunidades de trade." },
+  { date:"2025-05-26", type:"analysis",  title:"Análise Semanal",    desc:"Revisão semanal + preparação para fechamento de mês." },
+  { date:"2025-05-30", type:"rebalance", title:"Fechamento Mensal",  desc:"Análise completa de P&L de Maio. Definir estratégia e metas para Junho." },
+  { date:"2025-06-02", type:"analysis",  title:"Análise Semanal",    desc:"Início de ciclo de Junho. Verificar tendência macro e momentum." },
+  { date:"2025-06-09", type:"analysis",  title:"Análise Semanal",    desc:"Revisão de RSI + EMAs. Checar rebalanceamento." },
+  { date:"2025-06-12", type:"fed",       title:"Reunião FOMC",       desc:"Decisão de juros do Fed — evento de alto impacto para cripto. Reduzir exposição antes." },
+  { date:"2025-06-16", type:"rebalance", title:"Rebalanceamento",    desc:"Verificar alocações mensais e ajustar conforme sinais técnicos." },
+  { date:"2025-06-23", type:"analysis",  title:"Análise Semanal",    desc:"Revisão de RSI + EMAs. Verificar sinais abertos." },
+  { date:"2025-06-30", type:"rebalance", title:"Fechamento Mensal",  desc:"Análise completa de P&L de Junho. Definir estratégia para Julho." },
+];
+
+const EVENT_COLORS = {
+  analysis:  { bg:"#0d1a0d", border:"#22c55e", text:"#4ade80", dot:"#22c55e" },
+  rebalance: { bg:"#0d0d1a", border:"#3b82f6", text:"#60a5fa", dot:"#3b82f6" },
+  fed:       { bg:"#1a0d0d", border:"#ef4444", text:"#f87171", dot:"#ef4444" },
+  staking:   { bg:"#130d1a", border:"#a855f7", text:"#c084fc", dot:"#a855f7" },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TECHNICAL ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+// EMA: dá peso exponencial maior aos preços mais recentes
+function computeEMA(prices, period) {
+  if (prices.length < period) return [];
+  const k = 2 / (period + 1);
+  let ema = prices.slice(0, period).reduce((a,b) => a+b, 0) / period;
+  const result = [ema];
+  for (let i = period; i < prices.length; i++) {
+    ema = prices[i]*k + ema*(1-k);
+    result.push(ema);
+  }
+  return result;
+}
+
+// RSI: compara médias de ganhos vs perdas nos últimos N períodos
+function computeRSI(prices, period=14) {
+  if (prices.length < period+1) return null;
+  let gains=0, losses=0;
+  for (let i=1; i<=period; i++) {
+    const d = prices[i]-prices[i-1];
+    if (d>0) gains+=d; else losses+=Math.abs(d);
+  }
+  let ag = gains/period, al = losses/period;
+  for (let i=period+1; i<prices.length; i++) {
+    const d = prices[i]-prices[i-1];
+    ag = (ag*(period-1) + Math.max(0,d)) / period;
+    al = (al*(period-1) + Math.max(0,-d)) / period;
+  }
+  if (al===0) return 100;
+  return 100 - 100/(1 + ag/al);
+}
+
+// Regras de sinal baseadas em RSI + posição em relação às EMAs
+function getSignal(rsi, price, ema21, ema55) {
+  if (rsi===null || !ema21 || !ema55) return { label:"Calculando", color:"#888", score:0 };
+  const above21 = price > ema21;
+  const above55 = price > ema55;
+  if (rsi<35 && above21)        return { label:"COMPRA FORTE 🔥", color:"#00ff88", score:95 };
+  if (rsi<45 && above21)        return { label:"COMPRA",           color:"#22c55e", score:75 };
+  if (rsi>72)                   return { label:"VENDA / REALIZAR",  color:"#ef4444", score:15 };
+  if (rsi>63 && !above55)       return { label:"ATENÇÃO — VENDA",   color:"#f97316", score:30 };
+  if (!above21 && !above55)     return { label:"EVITAR ENTRADA",    color:"#dc2626", score:10 };
+  return                               { label:"AGUARDAR",           color:"#f59e0b", score:50 };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function fBRL(v) {
+  if (!v && v!==0) return "—";
+  return v.toLocaleString("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2});
+}
+function pad(n){ return String(n).padStart(2,"0"); }
+
+// Desenha mini-gráfico SVG dentro do card
+function miniChart(prices, color) {
+  if (!prices || prices.length<2) return "";
+  const w=90, h=36;
+  const min=Math.min(...prices), max=Math.max(...prices);
+  const range = max-min || 1;
+  const pts = prices.map((p,i)=>
+    `${(i/(prices.length-1))*w},${h-((p-min)/range)*h}`
+  ).join(" ");
+  const c = prices[prices.length-1]>=prices[0] ? "#22c55e" : "#ef4444";
+  return `<svg width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.5"/></svg>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API — COINGECKO (dados reais dos últimos 30 dias em BRL)
+// ═══════════════════════════════════════════════════════════════
+async function fetchCoin(coinId) {
+  const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=brl&days=30&interval=daily`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  return json.prices.map(([,p]) => p); // retorna apenas os preços
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SIGNALS PANEL
+// ═══════════════════════════════════════════════════════════════
+function renderSignals() {
+  const panel = document.getElementById("panel-signals");
+  panel.innerHTML = `
+    <div class="section-label">PREÇOS E INDICADORES — DADOS REAIS VIA COINGECKO</div>
+    <div class="coin-grid" id="coin-grid">
+      ${COINS.map(c => `
+        <div class="coin-card" id="card-${c.id}">
+          <div class="coin-card-accent" style="background:linear-gradient(90deg,transparent,${c.color},transparent)"></div>
+          <div class="coin-header">
+            <div>
+              <div class="coin-symbol-row">
+                <div class="coin-dot" style="background:${c.color}"></div>
+                <span class="coin-symbol" style="color:${c.color}">${c.symbol}</span>
+                ${c.owned ? '<span class="coin-badge">na carteira</span>' : ''}
+              </div>
+              <div class="coin-price" id="price-${c.id}">—</div>
+              <div class="coin-change" id="change-${c.id}" style="color:#444">buscando dados reais...</div>
+            </div>
+            <div id="chart-${c.id}"></div>
+          </div>
+          <div id="indicators-${c.id}">
+            <div class="loading-row">
+              <div class="spinner" style="border-color:${c.color};border-top-color:transparent"></div>
+              Consultando CoinGecko...
+            </div>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+    <div class="guide">
+      <div class="section-label">GUIA DE LEITURA DOS SINAIS</div>
+      <div class="guide-grid">
+        ${[
+          {s:"COMPRA FORTE 🔥",d:"RSI < 35 + preço acima EMA21",c:"#00ff88"},
+          {s:"COMPRA",         d:"RSI < 45 + tendência de alta", c:"#22c55e"},
+          {s:"AGUARDAR",       d:"Sem sinal claro definido",      c:"#f59e0b"},
+          {s:"VENDA / REALIZAR",d:"RSI > 72 — realizar lucros",  c:"#ef4444"},
+        ].map(g=>`
+          <div class="guide-item">
+            <div class="guide-dot" style="background:${g.c}"></div>
+            <div>
+              <div class="guide-signal" style="color:${g.c}">${g.s}</div>
+              <div class="guide-desc">${g.d}</div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+  loadAllCoins();
+}
+
+async function loadAllCoins() {
+  for (const coin of COINS) {
+    loadCoin(coin); // carrega em paralelo, um por vez para não bater no rate limit
+    await new Promise(r => setTimeout(r, 400)); // pequeno delay entre chamadas
+  }
+}
+
+async function loadCoin(coin) {
+  try {
+    const prices = await fetchCoin(coin.id);
+    const rsi    = computeRSI(prices);
+    const ema21a = computeEMA(prices, 21);
+    const ema55a = computeEMA(prices, Math.min(55, prices.length-1));
+    const ema21  = ema21a[ema21a.length-1];
+    const ema55  = ema55a[ema55a.length-1];
+    const price  = prices[prices.length-1];
+    const signal = getSignal(rsi, price, ema21, ema55);
+    const change = ((price - prices[0]) / prices[0]) * 100;
+
+    // Atualiza card com dados reais
+    document.getElementById(`card-${coin.id}`).style.borderColor = signal.color+"44";
+    document.getElementById(`price-${coin.id}`).textContent = fBRL(price);
+    const changeEl = document.getElementById(`change-${coin.id}`);
+    changeEl.textContent = `${change>=0?"▲":"▼"} ${Math.abs(change).toFixed(2)}% (30d)`;
+    changeEl.style.color = change>=0 ? "#22c55e" : "#ef4444";
+    document.getElementById(`chart-${coin.id}`).innerHTML = miniChart(prices.slice(-20), coin.color);
+
+    const rsiAlert = rsi<35 || rsi>70;
+    document.getElementById(`indicators-${coin.id}`).innerHTML = `
+      <div class="indicators">
+        <div class="indicator ${rsiAlert?"alert":""}">
+          <div class="indicator-label">RSI 14</div>
+          <div class="indicator-value">${rsi ? rsi.toFixed(1) : "—"}</div>
+        </div>
+        <div class="indicator">
+          <div class="indicator-label">EMA 21</div>
+          <div class="indicator-value">${fBRL(ema21)}</div>
+        </div>
+        <div class="indicator">
+          <div class="indicator-label">EMA 55</div>
+          <div class="indicator-value">${fBRL(ema55)}</div>
+        </div>
+      </div>
+      <span class="signal-badge" style="background:${signal.color}22;color:${signal.color};border:1px solid ${signal.color}55">
+        ${signal.label}
+      </span>
+      <div class="signal-bar-wrap">
+        <div class="signal-bar-label">FORÇA DO SINAL</div>
+        <div class="signal-bar-bg">
+          <div class="signal-bar-fill" style="width:${signal.score}%;background:linear-gradient(90deg,${signal.color}66,${signal.color})"></div>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    document.getElementById(`indicators-${coin.id}`).innerHTML =
+      `<div class="error-msg">⚠ Limite da API atingido — aguarde 1 minuto e clique Atualizar.</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALENDAR PANEL
+// ═══════════════════════════════════════════════════════════════
+let calState = { year: new Date().getFullYear(), month: new Date().getMonth(), selected: null };
+
+function renderCalendar() {
+  const panel = document.getElementById("panel-calendar");
+  const { year, month, selected } = calState;
+  const today = new Date();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+  const eventMap = {};
+  CALENDAR_EVENTS.forEach(e => { eventMap[e.date] = e; });
+
+  const cells = [];
+  for (let i=0; i<firstDay; i++) cells.push(null);
+  for (let d=1; d<=daysInMonth; d++) cells.push(d);
+
+  const todayStr = today.toISOString().slice(0,10);
+  const upcoming = CALENDAR_EVENTS.filter(e => e.date>=todayStr).slice(0,5);
+
+  panel.innerHTML = `
+    <div class="cal-nav">
+      <button class="cal-btn" onclick="calNav(-1)">‹</button>
+      <span class="cal-title">${MONTHS[month]} ${year}</span>
+      <button class="cal-btn" onclick="calNav(1)">›</button>
+    </div>
+
+    <div class="cal-legend">
+      ${[["analysis","Análise Técnica"],["rebalance","Rebalanceamento"],["fed","Evento Macro"],["staking","Staking"]].map(([t,l])=>`
+        <div class="cal-legend-item">
+          <div class="cal-legend-dot" style="background:${EVENT_COLORS[t].dot}"></div>${l}
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="cal-days-header">
+      ${["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map(d=>`<div class="cal-day-name">${d}</div>`).join("")}
+    </div>
+
+    <div class="cal-grid">
+      ${cells.map((d,i) => {
+        if (!d) return `<div></div>`;
+        const key = `${year}-${pad(month+1)}-${pad(d)}`;
+        const ev = eventMap[key];
+        const ec = ev ? EVENT_COLORS[ev.type] : null;
+        const isToday = d===today.getDate() && month===today.getMonth() && year===today.getFullYear();
+        return `
+          <div class="cal-cell ${isToday?"today":""} ${ev?"has-event":""}"
+            style="${ec ? `background:${ec.bg};border-color:${ec.border}44` : ""}"
+            ${ev ? `onclick="calSelect('${key}')"` : ""}>
+            <span class="cal-cell-num" style="${ec ? `color:${ec.text}` : ""}">${d}</span>
+            ${ev ? `<div class="cal-event-dot" style="background:${ec.dot}"></div>` : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+
+    ${selected ? `
+      <div class="cal-event-detail" style="background:${EVENT_COLORS[selected.type].bg};border:1px solid ${EVENT_COLORS[selected.type].border}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="cal-event-type" style="color:${EVENT_COLORS[selected.type].text}">${selected.date} · ${selected.type.toUpperCase()}</div>
+            <div class="cal-event-title">${selected.title}</div>
+          </div>
+          <button class="cal-close" onclick="calClose()">✕</button>
+        </div>
+        <div class="cal-event-desc">${selected.desc}</div>
+      </div>
+    ` : ""}
+
+    <div class="cal-upcoming-label">PRÓXIMOS EVENTOS</div>
+    ${upcoming.map(e => {
+      const ec = EVENT_COLORS[e.type];
+      return `
+        <div class="cal-upcoming-item" onclick="calSelectEvent('${e.date}')">
+          <div class="cal-upcoming-bar" style="background:${ec.dot}"></div>
+          <div>
+            <div class="cal-upcoming-date">${e.date}</div>
+            <div class="cal-upcoming-title" style="color:${ec.text}">${e.title}</div>
+            <div class="cal-upcoming-desc">${e.desc.substring(0,65)}…</div>
+          </div>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
+
+function calNav(dir) {
+  let m = calState.month + dir;
+  let y = calState.year;
+  if (m>11) { m=0; y++; }
+  if (m<0)  { m=11; y--; }
+  calState = { ...calState, year:y, month:m, selected:null };
+  renderCalendar();
+}
+
+function calSelect(dateKey) {
+  const ev = CALENDAR_EVENTS.find(e => e.date===dateKey);
+  calState.selected = ev || null;
+  renderCalendar();
+}
+
+function calSelectEvent(dateKey) { calSelect(dateKey); }
+function calClose() { calState.selected=null; renderCalendar(); }
+
+// ═══════════════════════════════════════════════════════════════
+// REBALANCE PANEL
+// ═══════════════════════════════════════════════════════════════
+function renderRebalance() {
+  const panel = document.getElementById("panel-rebalance");
+  const target  = { DOT:40, ETH:35, BTC:15, SOL:5, AVAX:5 };
+  const current = { DOT:75, ETH:24, BTC:0,  SOL:0, AVAX:0 };
+  const colors  = { DOT:"#E6007A", ETH:"#627EEA", BTC:"#F7931A", SOL:"#9945FF", AVAX:"#E84142" };
+
+  panel.innerHTML = `
+    <div class="rebal-alert">
+      <div class="rebal-alert-label">💡 DIAGNÓSTICO</div>
+      <div class="rebal-alert-text">
+        Sua carteira está 75% concentrada em DOT. Para swing trade agressivo, alta concentração em um único ativo
+        aumenta o risco sem necessariamente aumentar o retorno. A sugestão abaixo distribui melhor o risco mantendo
+        exposição a ativos com beta alto.
+      </div>
+    </div>
+
+    ${Object.entries(target).map(([sym, tgt]) => {
+      const curr = current[sym]||0;
+      const diff = tgt - curr;
+      const c = colors[sym];
+      return `
+        <div class="rebal-item">
+          <div class="rebal-row">
+            <div class="rebal-sym-row">
+              <div class="coin-dot" style="background:${c}"></div>
+              <span class="rebal-sym">${sym}</span>
+            </div>
+            <div class="rebal-nums">
+              <span class="rebal-curr">atual: ${curr}%</span>
+              <span class="rebal-target">→ meta: ${tgt}%</span>
+              <span class="rebal-diff" style="color:${diff>0?"#22c55e":diff<0?"#ef4444":"#555"}">${diff>0?"+":""}${diff}%</span>
+            </div>
+          </div>
+          <div class="rebal-bar-bg">
+            <div class="rebal-bar-curr" style="width:${curr}%;background:${c}77"></div>
+            <div class="rebal-bar-target" style="width:${tgt}%;border:1px solid ${c}"></div>
+          </div>
+        </div>
+      `;
+    }).join("")}
+
+    <div class="rebal-plan">
+      <div class="rebal-plan-label">PLANO DE AÇÃO SUGERIDO</div>
+      ${[
+        "Não aumentar posição em DOT no curto prazo — aguardar RSI < 40 para nova entrada",
+        "Comprar ETH se RSI cair abaixo de 40 esta semana (consulte aba Sinais)",
+        "Alocar ~15% em BTC como âncora — reduz volatilidade do portfólio",
+        "Aguardar sinal técnico claro de SOL e AVAX antes de aportar",
+        "Revisar alocação no dia 15 conforme calendário de rebalanceamento",
+      ].map(tip=>`
+        <div class="rebal-tip">
+          <span class="rebal-tip-arrow">→</span>
+          <span class="rebal-tip-text">${tip}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABS & REFRESH
+// ═══════════════════════════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  el.classList.add("active");
+  ["signals","calendar","rebalance"].forEach(p => {
+    document.getElementById(`panel-${p}`).style.display = p===name ? "block" : "none";
+  });
+}
+
+let cooldown = false;
+function refresh() {
+  if (cooldown) return;
+  renderSignals();
+  const meta = document.getElementById("header-meta");
+  const btn  = document.getElementById("btn-refresh");
+  meta.textContent = `última consulta: ${new Date().toLocaleTimeString("pt-BR")} · CoinGecko API · RSI 14 + EMA 21/55`;
+  cooldown = true;
+  btn.disabled = true;
+  btn.textContent = "⏳ aguardar...";
+  setTimeout(() => {
+    cooldown = false;
+    btn.disabled = false;
+    btn.textContent = "↻ Atualizar";
+  }, 60000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PWA — SERVICE WORKER + INSTALL PROMPT
+// ═══════════════════════════════════════════════════════════════
+let deferredPrompt = null;
+
+// Captura o evento de instalação do browser
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById("install-banner").classList.remove("hidden");
+});
+
+function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById("install-banner").classList.add("hidden");
+  });
+}
+
+// Registra Service Worker para funcionamento offline
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    // O service worker é inline via blob para funcionar em arquivo único
+    const swCode = `
+      const CACHE = "crypto-dash-v1";
+      const ASSETS = ["/", "./index.html"];
+      self.addEventListener("install", e => {
+        e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+      });
+      self.addEventListener("fetch", e => {
+        // Para a API do CoinGecko, sempre busca rede (dados frescos)
+        if (e.request.url.includes("coingecko")) return;
+        e.respondWith(
+          caches.match(e.request).then(r => r || fetch(e.request))
+        );
+      });
+    `;
+    const blob = new Blob([swCode], { type: "application/javascript" });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).catch(() => {});
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+renderSignals();
+renderCalendar();
+renderRebalance();
+
+document.getElementById("header-meta").textContent =
+  `última consulta: ${new Date().toLocaleTimeString("pt-BR")} · CoinGecko API · RSI 14 + EMA 21/55`;
+</script>
+
+</body>
+</html>
